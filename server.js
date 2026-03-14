@@ -7,13 +7,21 @@ const OpenAI = require("openai");
 const app = express();
 app.use(cors());
 
+/* Ensure uploads folder exists */
+
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
+
 const upload = multer({ dest: "uploads/" });
 
+/* OpenAI */
+
 const openai = new OpenAI({
-  apiKey: "YOUR_OPENAI_API_KEY"
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-/* TEST */
+/* TEST ROUTE */
 
 app.get("/", (req,res)=>{
   res.send("AI Poster Vision API running");
@@ -46,17 +54,32 @@ role:"system",
 content:`
 You are an AI that extracts event data from posters.
 
-Return clean JSON with:
+Return clean JSON with these fields:
 
 title
 date
 location
 eventType
 description
-lineup (array)
-tickets (array with name + price)
+lineup
+tickets
 
-If unknown return null.
+Example:
+
+{
+"title":"Afro Night Festival",
+"date":"12 July 2026",
+"location":"Nairobi",
+"eventType":"Concert",
+"description":"Join Nairobi's biggest Afro music party...",
+"lineup":["DJ Joe","MC Vee"],
+"tickets":[
+{"name":"Early Bird","price":"1000"},
+{"name":"VIP","price":"3000"}
+]
+}
+
+If a field cannot be detected return null.
 `
 },
 
@@ -81,7 +104,13 @@ response_format:{ type:"json_object" }
 
 });
 
+/* parse AI response */
+
 const data = JSON.parse(response.choices[0].message.content);
+
+/* delete uploaded file */
+
+fs.unlinkSync(req.file.path);
 
 res.json({
 success:true,
@@ -91,18 +120,21 @@ data
 }
 catch(err){
 
-console.error(err);
+console.error("AI ERROR:", err);
 
 res.status(500).json({
-error:"AI Vision parsing failed"
+error:"AI Vision parsing failed",
+details: err.message
 });
 
 }
 
 });
 
-/* START */
+/* START SERVER */
 
-app.listen(3000, ()=>{
-console.log("Vision AI running http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, ()=>{
+console.log("Vision AI running on port " + PORT);
 });
